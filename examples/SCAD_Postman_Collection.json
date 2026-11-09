@@ -1,0 +1,277 @@
+{
+  "info": {
+    "name": "SCAD Coordena v0.2 - Compradores Regionais",
+    "_postman_id": "scad-coordena-regional-mvp-v02",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Ambiente de laboratório: alterar credenciais e baseUrl. Execute o login primeiro para guardar token na collection."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "COLAR_TOKEN_AQUI",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "COLAR_UUID_AQUI",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Saúde pública",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      }
+    },
+    {
+      "name": "1. Login comprador Sul",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "login"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"buyer-south\",\n  \"password\": \"SulDemo2026!\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const data = pm.response.json();",
+              "if (pm.response.code === 200 && data.data?.token) {",
+              "  pm.collectionVariables.set(\"token\", data.data.token);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Sessão actual",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/auth/me",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "me"
+          ]
+        }
+      }
+    },
+    {
+      "name": "3. Inventário do centro",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/stocks",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "stocks"
+          ]
+        }
+      }
+    },
+    {
+      "name": "4. Criar encomenda Sul",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/purchases",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "purchases"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"supplierId\": \"SUP-REST\",\n  \"batchId\": \"POSTMAN-SUL-001\",\n  \"items\": [\n    {\n      \"region\": \"south\",\n      \"productId\": \"RICE25\",\n      \"quantity\": 10\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "5. Histórico de encomendas",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/purchases",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "purchases"
+          ]
+        }
+      }
+    },
+    {
+      "name": "6. Confirmar recepção",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/purchases/{{orderId}}/receive",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "purchases",
+            "{{orderId}}",
+            "receive"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"region\": \"south\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "7. Histórico de recepções",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/receipts",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "receipts"
+          ]
+        }
+      }
+    },
+    {
+      "name": "8. Teste 403: comprador Sul pede Centro",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/purchases",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "purchases"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"supplierId\": \"SUP-REST\",\n  \"batchId\": \"POSTMAN-SEM-PERMISSAO\",\n  \"items\": [\n    {\n      \"region\": \"center\",\n      \"productId\": \"RICE25\",\n      \"quantity\": 1\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

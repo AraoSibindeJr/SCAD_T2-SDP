@@ -1,0 +1,9 @@
+{
+  "name": "scad-suppliers-mock",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "tsc -p tsconfig.json", "start": "node dist/index.js" },
+  "dependencies": { "express": "^4.21.2", "fast-xml-parser": "^4.5.0" },
+  "devDependencies": { "@types/express": "^4.17.21", "@types/node": "^22.13.0", "typescript": "^5.7.3" }
+}

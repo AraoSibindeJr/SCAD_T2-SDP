@@ -1,0 +1,30 @@
+{
+  "name": "scad-coordena-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "etcd3": "^1.1.2",
+    "express": "^4.21.2",
+    "fast-xml-parser": "^4.5.0",
+    "pdfkit": "^0.16.0",
+    "pg": "^8.13.3",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.13.0",
+    "@types/pdfkit": "^0.13.8",
+    "@types/pg": "^8.11.11",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

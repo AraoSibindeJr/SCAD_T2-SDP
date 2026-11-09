@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/"
+ xmlns:tns="urn:scad:supplier"
+ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+ xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+ targetNamespace="urn:scad:supplier" name="SCADSupplier">
+  <types>
+    <xsd:schema targetNamespace="urn:scad:supplier" elementFormDefault="qualified">
+      <xsd:element name="CreatePurchaseOrder">
+        <xsd:complexType><xsd:sequence>
+          <xsd:element name="OrderId" type="xsd:string"/>
+          <xsd:element name="BatchId" type="xsd:string"/>
+          <xsd:element name="ItemsJson" type="xsd:string"/>
+        </xsd:sequence></xsd:complexType>
+      </xsd:element>
+      <xsd:element name="CreatePurchaseOrderResponse">
+        <xsd:complexType><xsd:sequence>
+          <xsd:element name="ExternalOrderId" type="xsd:string"/>
+          <xsd:element name="Status" type="xsd:string"/>
+        </xsd:sequence></xsd:complexType>
+      </xsd:element>
+    </xsd:schema>
+  </types>
+  <message name="CreatePurchaseOrderInput"><part name="parameters" element="tns:CreatePurchaseOrder"/></message>
+  <message name="CreatePurchaseOrderOutput"><part name="parameters" element="tns:CreatePurchaseOrderResponse"/></message>
+  <portType name="SupplierPortType">
+    <operation name="CreatePurchaseOrder">
+      <input message="tns:CreatePurchaseOrderInput"/>
+      <output message="tns:CreatePurchaseOrderOutput"/>
+    </operation>
+  </portType>
+  <binding name="SupplierBinding" type="tns:SupplierPortType">
+    <soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="document"/>
+    <operation name="CreatePurchaseOrder"><soap:operation soapAction="CreatePurchaseOrder"/>
+      <input><soap:body use="literal"/></input><output><soap:body use="literal"/></output>
+    </operation>
+  </binding>
+  <service name="SCADSupplierService">
+    <port name="SupplierPort" binding="tns:SupplierBinding">
+      <soap:address location="http://supplier-mock:4000/soap"/>
+    </port>
+  </service>
+</definitions>

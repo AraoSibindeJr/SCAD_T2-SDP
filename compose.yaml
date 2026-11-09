@@ -1,0 +1,259 @@
+name: scad-coordena-mvp
+
+x-db-base: &db-base
+  image: postgres:16-alpine
+  restart: unless-stopped
+  command: ["postgres", "-c", "wal_level=replica", "-c", "max_wal_senders=10", "-c", "max_replication_slots=10", "-c", "max_prepared_transactions=100", "-c", "wal_keep_size=128MB", "-c", "max_connections=100"]
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U scad -d scad"]
+    interval: 5s
+    timeout: 3s
+    retries: 20
+    start_period: 15s
+
+x-db-env: &db-env
+  POSTGRES_USER: scad
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scad_dev_password}
+  POSTGRES_DB: scad
+  REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:-scad_replica_dev}
+
+x-standby: &standby-base
+  image: postgres:16-alpine
+  restart: unless-stopped
+  entrypoint: ["/bin/sh", "/scripts/standby.sh"]
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U scad -d scad && test \"$$(psql -U scad -d scad -tAc 'SELECT pg_is_in_recovery()')\" = 't'"]
+    interval: 5s
+    timeout: 3s
+    retries: 30
+    start_period: 25s
+
+x-etcd-base: &etcd-base
+  image: quay.io/coreos/etcd:v3.5.17
+  restart: unless-stopped
+  command:
+    - /usr/local/bin/etcd
+    - --listen-client-urls=http://0.0.0.0:2379
+    - --listen-peer-urls=http://0.0.0.0:2380
+    - --initial-cluster=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+    - --initial-cluster-state=new
+    - --initial-cluster-token=scad-lab-cluster
+
+services:
+  pg-south:
+    <<: *db-base
+    environment:
+      <<: *db-env
+      REGION: south
+    volumes:
+      - pg_south:/var/lib/postgresql/data
+      - ./infra/postgres/init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
+      - ./infra/postgres/schema.sql:/schema.sql:ro
+
+  pg-center:
+    <<: *db-base
+    environment:
+      <<: *db-env
+      REGION: center
+    volumes:
+      - pg_center:/var/lib/postgresql/data
+      - ./infra/postgres/init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
+      - ./infra/postgres/schema.sql:/schema.sql:ro
+
+  pg-north:
+    <<: *db-base
+    environment:
+      <<: *db-env
+      REGION: north
+    volumes:
+      - pg_north:/var/lib/postgresql/data
+      - ./infra/postgres/init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
+      - ./infra/postgres/schema.sql:/schema.sql:ro
+
+  pg-south-replica:
+    <<: *standby-base
+    depends_on:
+      pg-south: {condition: service_healthy}
+    environment:
+      PRIMARY_HOST: pg-south
+      REPLICA_NAME: replica_south
+      PGDATA: /var/lib/postgresql/data/pgdata
+      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:-scad_replica_dev}
+    volumes:
+      - pg_south_replica:/var/lib/postgresql/data
+      - ./infra/postgres/standby.sh:/scripts/standby.sh:ro
+
+  pg-center-replica:
+    <<: *standby-base
+    depends_on:
+      pg-center: {condition: service_healthy}
+    environment:
+      PRIMARY_HOST: pg-center
+      REPLICA_NAME: replica_center
+      PGDATA: /var/lib/postgresql/data/pgdata
+      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:-scad_replica_dev}
+    volumes:
+      - pg_center_replica:/var/lib/postgresql/data
+      - ./infra/postgres/standby.sh:/scripts/standby.sh:ro
+
+  pg-north-replica:
+    <<: *standby-base
+    depends_on:
+      pg-north: {condition: service_healthy}
+    environment:
+      PRIMARY_HOST: pg-north
+      REPLICA_NAME: replica_north
+      PGDATA: /var/lib/postgresql/data/pgdata
+      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:-scad_replica_dev}
+    volumes:
+      - pg_north_replica:/var/lib/postgresql/data
+      - ./infra/postgres/standby.sh:/scripts/standby.sh:ro
+
+  etcd1:
+    <<: *etcd-base
+    command:
+      - /usr/local/bin/etcd
+      - --name=etcd1
+      - --data-dir=/etcd-data
+      - --initial-advertise-peer-urls=http://etcd1:2380
+      - --advertise-client-urls=http://etcd1:2379
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-cluster=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=scad-lab-cluster
+    volumes: ["etcd1_data:/etcd-data"]
+  etcd2:
+    <<: *etcd-base
+    command:
+      - /usr/local/bin/etcd
+      - --name=etcd2
+      - --data-dir=/etcd-data
+      - --initial-advertise-peer-urls=http://etcd2:2380
+      - --advertise-client-urls=http://etcd2:2379
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-cluster=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=scad-lab-cluster
+    volumes: ["etcd2_data:/etcd-data"]
+  etcd3:
+    <<: *etcd-base
+    command:
+      - /usr/local/bin/etcd
+      - --name=etcd3
+      - --data-dir=/etcd-data
+      - --initial-advertise-peer-urls=http://etcd3:2380
+      - --advertise-client-urls=http://etcd3:2379
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-cluster=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=scad-lab-cluster
+    volumes: ["etcd3_data:/etcd-data"]
+
+  supplier-mock:
+    build: ./apps/supplier-mock
+    restart: unless-stopped
+    environment:
+      PORT: 4000
+      SUPPLIER_DATA_FILE: /data/orders.json
+    volumes: ["supplier_data:/data"]
+
+  api:
+    image: scad-coordena-api:local
+    build: ./apps/api
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scad_dev_password}
+      DB_SOUTH_HOST: pg-south
+      DB_CENTER_HOST: pg-center
+      DB_NORTH_HOST: pg-north
+      ETCD_ENDPOINTS: etcd1:2379,etcd2:2379,etcd3:2379
+      REST_SUPPLIER_URL: http://supplier-mock:4000/api/orders
+      SOAP_SUPPLIER_URL: http://supplier-mock:4000/soap
+      FILES_DIR: /files
+      MONITOR_INTERVAL_MS: ${MONITOR_INTERVAL_MS:-20000}
+      SCAD_AUTH_SECRET: ${SCAD_AUTH_SECRET:?Define SCAD_AUTH_SECRET em .env}
+      SCAD_ADMIN_PASSWORD: ${SCAD_ADMIN_PASSWORD:?Define SCAD_ADMIN_PASSWORD em .env}
+      SCAD_BUYER_SOUTH_PASSWORD: ${SCAD_BUYER_SOUTH_PASSWORD:?Define SCAD_BUYER_SOUTH_PASSWORD em .env}
+      SCAD_BUYER_CENTER_PASSWORD: ${SCAD_BUYER_CENTER_PASSWORD:?Define SCAD_BUYER_CENTER_PASSWORD em .env}
+      SCAD_BUYER_NORTH_PASSWORD: ${SCAD_BUYER_NORTH_PASSWORD:?Define SCAD_BUYER_NORTH_PASSWORD em .env}
+      SCAD_AGENT_SECRET: ${SCAD_AGENT_SECRET:?Define SCAD_AGENT_SECRET em .env}
+    volumes: ["scad_files:/files"]
+    depends_on:
+      pg-south: {condition: service_healthy}
+      pg-center: {condition: service_healthy}
+      pg-north: {condition: service_healthy}
+      etcd1: {condition: service_started}
+      etcd2: {condition: service_started}
+      etcd3: {condition: service_started}
+      supplier-mock: {condition: service_started}
+    ports: ["127.0.0.1:3000:3000"]
+
+
+  agent-south:
+    image: scad-coordena-api:local
+    restart: unless-stopped
+    command: ["node", "dist/agent.js"]
+    environment:
+      REGION: south
+      DB_HOST: pg-south
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scad_dev_password}
+      API_URL: http://api:3000
+      AGENT_INTERVAL_MS: 15000
+      SCAD_AGENT_SECRET: ${SCAD_AGENT_SECRET:?Define SCAD_AGENT_SECRET em .env}
+    depends_on:
+      api: {condition: service_started}
+      pg-south: {condition: service_healthy}
+
+  agent-center:
+    image: scad-coordena-api:local
+    restart: unless-stopped
+    command: ["node", "dist/agent.js"]
+    environment:
+      REGION: center
+      DB_HOST: pg-center
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scad_dev_password}
+      API_URL: http://api:3000
+      AGENT_INTERVAL_MS: 15000
+      SCAD_AGENT_SECRET: ${SCAD_AGENT_SECRET:?Define SCAD_AGENT_SECRET em .env}
+    depends_on:
+      api: {condition: service_started}
+      pg-center: {condition: service_healthy}
+
+  agent-north:
+    image: scad-coordena-api:local
+    restart: unless-stopped
+    command: ["node", "dist/agent.js"]
+    environment:
+      REGION: north
+      DB_HOST: pg-north
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scad_dev_password}
+      API_URL: http://api:3000
+      AGENT_INTERVAL_MS: 15000
+      SCAD_AGENT_SECRET: ${SCAD_AGENT_SECRET:?Define SCAD_AGENT_SECRET em .env}
+    depends_on:
+      api: {condition: service_started}
+      pg-north: {condition: service_healthy}
+
+  web:
+    build: ./apps/web
+    restart: unless-stopped
+    depends_on:
+      api: {condition: service_started}
+    ports: ["${SCAD_BIND_ADDRESS:-0.0.0.0}:8080:80"]
+
+volumes:
+  pg_south:
+  pg_center:
+  pg_north:
+  pg_south_replica:
+  pg_center_replica:
+  pg_north_replica:
+  etcd1_data:
+  etcd2_data:
+  etcd3_data:
+  scad_files:
+  supplier_data:

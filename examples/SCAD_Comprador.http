@@ -1,0 +1,64 @@
+# Extensão VS Code REST Client
+# Substituir o IP pelo endereço do servidor SCAD.
+@baseUrl = http://localhost:8080/api
+@token = COLOCAR_AQUI_O_TOKEN
+@orderId = COLOCAR_AQUI_O_UUID
+
+### 1. Saúde (público)
+GET {{baseUrl}}/health
+
+### 2. Login do comprador de Maputo
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "buyer-south",
+  "password": "SulDemo2026!"
+}
+
+### 3. Quem sou eu?
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}
+
+### 4. Inventário do meu centro
+GET {{baseUrl}}/stocks
+Authorization: Bearer {{token}}
+
+### 5. Criar encomenda (trocar batchId para cada ordem nova)
+POST {{baseUrl}}/purchases
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "supplierId": "SUP-REST",
+  "batchId": "SUL-REST-001",
+  "items": [
+    { "region": "south", "productId": "RICE25", "quantity": 8 }
+  ]
+}
+
+### 6. Listar encomendas do meu centro
+GET {{baseUrl}}/purchases
+Authorization: Bearer {{token}}
+
+### 7. Registar recepção (após CONFIRMED)
+POST {{baseUrl}}/purchases/{{orderId}}/receive
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "region": "south" }
+
+### 8. Consultar histórico de recepções
+GET {{baseUrl}}/receipts
+Authorization: Bearer {{token}}
+
+### 9. Teste negativo: comprador Sul não pode comprar no Centro (esperado 403)
+POST {{baseUrl}}/purchases
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "supplierId": "SUP-REST",
+  "batchId": "SUL-SEM-PERMISSAO",
+  "items": [ { "region": "center", "productId": "RICE25", "quantity": 1 } ]
+}
